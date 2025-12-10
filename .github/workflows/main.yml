@@ -4,48 +4,66 @@ on:
   workflow_dispatch:
 
 jobs:
-  win-rdp:
+  secure-rdp:
     runs-on: windows-latest
-    timeout-minutes: 350  # 5h 50m
+    timeout-minutes: 3600
 
     steps:
-      - name: Configurar RDP en Windows
+      - name: Configure Core RDP Settings
         run: |
-          # Habilitar RDP
-          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+          # Enable Remote Desktop
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
+                             -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
+                             -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
+                             -Name "SecurityLayer" -Value 0 -Force
 
-          # Eliminar usuario previo si existía
+          # Reset firewall rule
+          netsh advfirewall firewall delete rule name="RDP-Tailscale"
+          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
+
+          Restart-Service -Name TermService -Force
+
+      - name: Create RDP User with Fixed Password
+        run: |
+          # Remove previous user if exists
           net user RDP /delete
 
-          # Crear usuario con contraseña válida (máx 14 caracteres)
+          # Create user with your fixed password (under 14 chars)
           net user RDP "RdpWin2025!#" /add
-          net localgroup administrators RDP /add
+          net localgroup Administrators RDP /add
+          net localgroup "Remote Desktop Users" RDP /add
 
-          # Abrir firewall para RDP
-          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
-
-      - name: Instalar Tailscale
+      - name: Install Tailscale
         run: |
-          Invoke-WebRequest https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale.exe
-          Start-Process .\tailscale.exe -ArgumentList "/quiet" -Wait
+          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
+          $installerPath = "$env:TEMP\tailscale.msi"
+          
+          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
+          Remove-Item $installerPath -Force
 
-      - name: Conectar a Tailscale
+      - name: Establish Tailscale Connection
         run: |
-          & "C:\Program Files\Tailscale\tailscale.exe" up --auth-key "${{ secrets.TAILSCALE_KEY }}" --hostname github-rdp
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up `
+            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} `
+            --hostname=github-rdp
 
-      - name: Mostrar credenciales finales
+      - name: Show MagicDNS Connection Info
         run: |
-          Write-Host "====================================="
-          Write-Host "       DATOS DE CONEXIÓN RDP"
-          Write-Host "====================================="
+          Write-Host "`n==============================="
+          Write-Host "         RDP ACCESS INFO"
+          Write-Host "==============================="
           Write-Host "Host (MagicDNS): github-rdp.tail3f304d.ts.net"
           Write-Host "Usuario: RDP"
           Write-Host "Contraseña: RdpWin2025!#"
-          Write-Host "====================================="
-          Write-Host ""
-          Write-Host "Usa exactamente ese host en la app de Conexión a Escritorio Remoto."
-          Write-Host "No necesitas IP."
-      
-      - name: Mantener la VM viva
+          Write-Host "==============================="
+          Write-Host "`nConéctate usando MagicDNS (sin IP)."
+
+      - name: Maintain Connection
         run: |
-          while ($true) { Start-Sleep -Seconds 60 }
+          while ($true) {
+              Write-Host "[$(Get-Date)] RDP Active..."
+              Start-Sleep -Seconds 300
+          }
