@@ -14,14 +14,14 @@ jobs:
           # Habilitar RDP
           Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
 
-          # Eliminar usuario previo si existe
+          # Eliminar usuario previo si existía
           net user RDP /delete
 
-          # Crear usuario RDP con contraseña válida
-          net user RDP "RdpWin2025!Secure#1" /add
+          # Crear usuario con contraseña válida (máx 14 caracteres)
+          net user RDP "RdpWin2025!#" /add
           net localgroup administrators RDP /add
 
-          # Abrir firewall
+          # Abrir firewall para RDP
           netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
 
       - name: Instalar Tailscale
@@ -29,10 +29,23 @@ jobs:
           Invoke-WebRequest https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale.exe
           Start-Process .\tailscale.exe -ArgumentList "/quiet" -Wait
 
-      - name: Conectar Tailscale con Machine Auth Key
+      - name: Conectar a Tailscale
         run: |
           & "C:\Program Files\Tailscale\tailscale.exe" up --auth-key "${{ secrets.TAILSCALE_KEY }}" --hostname github-rdp
 
+      - name: Mostrar credenciales finales
+        run: |
+          Write-Host "====================================="
+          Write-Host "       DATOS DE CONEXIÓN RDP"
+          Write-Host "====================================="
+          Write-Host "Host (MagicDNS): github-rdp.tail3f304d.ts.net"
+          Write-Host "Usuario: RDP"
+          Write-Host "Contraseña: RdpWin2025!#"
+          Write-Host "====================================="
+          Write-Host ""
+          Write-Host "Usa exactamente ese host en la app de Conexión a Escritorio Remoto."
+          Write-Host "No necesitas IP."
+      
       - name: Mantener la VM viva
         run: |
           while ($true) { Start-Sleep -Seconds 60 }
