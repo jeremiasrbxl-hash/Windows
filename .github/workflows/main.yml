@@ -1,91 +1,43 @@
 name: RDP
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:      # Permite iniciarlo manualmente
+  schedule:
+    - cron: "0 */6 * * *" # Se reinicia cada 6 horas automáticamente
 
 jobs:
-  secure-rdp:
+  rdp-server:
     runs-on: windows-latest
-    timeout-minutes: 351  # 5h 50m
+    timeout-minutes: 350   # 5h50m (se detiene antes del límite de 6h)
 
     steps:
-      - name: Configure Core RDP Settings
+      - name: Descargar Tailscale
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
-                             -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
-                             -Name "UserAuthentication" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
-                             -Name "SecurityLayer" -Value 0 -Force
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" `
+                             -OutFile "tailscale.exe"
 
-          netsh advfirewall firewall delete rule name="RDP-Tailscale"
-          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
-
-          Restart-Service -Name TermService -Force
-
-      - name: Create RDP User with FIXED Password
+      - name: Instalar Tailscale
         run: |
-          $password = "930201870Aa!"
-          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+          Start-Process ".\tailscale.exe" -ArgumentList "/quiet" -Wait
 
-          # Remove old user if exists
-          if (Get-LocalUser -Name "RDP" -ErrorAction SilentlyContinue) {
-              Remove-LocalUser -Name "RDP"
-          }
-
-          New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
-
-          echo "RDP_PASSWORD=$password" >> $env:GITHUB_ENV
-
-      - name: Install Tailscale
-        run: |
-          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
-          $installerPath = "$env:TEMP\tailscale.msi"
-          
-          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
-          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
-          Remove-Item $installerPath -Force
-
-      - name: Connect to Tailscale (Reusable Key)
-        run: |
-          # Bring up Tailscale with reusable pre-auth key
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up `
-            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} `
-            --hostname=RDP-GITHUB `
-            --accept-routes `
-            --accept-dns
-
-          # Get IP
-          $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-          echo "TS_IP=$tsIP" >> $env:GITHUB_ENV
-
-      - name: Show RDP Info
-        run: |
-          Write-Host "================================"
-          Write-Host "      YOUR WINDOWS RDP"
-          Write-Host "================================"
-          Write-Host "Tailscale IP: $env:TS_IP"
-          Write-Host "User: RDP"
-          Write-Host "Password: $env:RDP_PASSWORD"
-          Write-Host "================================"
-
-      - name: Keep Alive (5h 50m)
-        run: |
-          for ($i=0; $i -lt 209; $i++) {  # 209 loops * 100s ≈ 5h50m
-            Write-Host "[$(Get-Date)] RDP Running..."
-            Start-Sleep -Seconds 100
-          }
-
-      - name: Auto-Restart Workflow
+      - name: Iniciar Tailscale con hostname fijo
         env:
-          GH_TOKEN: ${{ secrets.PAT_FOR_RESTART }}
+          TS_KEY: ${{ secrets.TS_KEY }}
         run: |
-          $repo = "${{ github.repository }}"
-          $workflow = "RDP.yml"
-          Write-Host "Restarting workflow..."
-          Invoke-RestMethod -Method Post `
-            -Uri "https://api.github.com/repos/$repo/actions/workflows/$workflow/dispatches" `
-            -Headers @{Authorization = "token $env:GH_TOKEN"} `
-            -Body '{"ref":"main"}'
+          tailscale up `
+            --authkey=$env:TS_KEY `
+            --hostname=github-rdp `
+            --accept-routes `
+            --ssh
+
+      - name: Habilitar Remote Desktop (RDP)
+        run: |
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
+                           -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+      - name: Mantener RDP activo
+        run: |
+          while ($true) {
+            Start-Sleep -Seconds 60
+          }
