@@ -14,11 +14,14 @@ jobs:
           # Habilitar RDP
           Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
 
-          # Crear usuario RDP con contraseña COMPLEJA
-          net user RDP "RdpWin2025!" /add
+          # Eliminar usuario previo si existe
+          net user RDP /delete
+
+          # Crear usuario RDP con contraseña válida
+          net user RDP "RdpWin2025!Secure#1" /add
           net localgroup administrators RDP /add
 
-          # Abrir firewall para RDP
+          # Abrir firewall
           netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
 
       - name: Instalar Tailscale
@@ -26,7 +29,7 @@ jobs:
           Invoke-WebRequest https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale.exe
           Start-Process .\tailscale.exe -ArgumentList "/quiet" -Wait
 
-      - name: Conectar a Tailscale con Machine Auth Key
+      - name: Conectar Tailscale con Machine Auth Key
         run: |
           & "C:\Program Files\Tailscale\tailscale.exe" up --auth-key "${{ secrets.TAILSCALE_KEY }}" --hostname github-rdp
 
