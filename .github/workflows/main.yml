@@ -2,40 +2,34 @@ name: RDP
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 */6 * * *"
 
 jobs:
-  rdp-server:
+  win-rdp:
     runs-on: windows-latest
-    timeout-minutes: 350
+    timeout-minutes: 350  # 5h 50m
 
     steps:
-      - name: Descargar Tailscale
+      - name: Configurar RDP en Windows
         run: |
-          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "tailscale.exe"
+          # Habilitar RDP
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+
+          # Crear usuario RDP con contraseña definida
+          net user RDP "RdpWin2025" /add
+          net localgroup administrators RDP /add
+
+          # Abrir firewall para RDP
+          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
 
       - name: Instalar Tailscale
         run: |
-          Start-Process ".\tailscale.exe" -ArgumentList "/quiet" -Wait
+          Invoke-WebRequest https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale.exe
+          Start-Process .\tailscale.exe -ArgumentList "/quiet" -Wait
 
-      - name: Iniciar Tailscale con hostname fijo
-        env:
-          TS_KEY: ${{ secrets.TS_KEY }}
+      - name: Conectar a Tailscale con Machine Auth Key
         run: |
-          & "C:\Program Files\Tailscale\tailscale.exe" up `
-            --authkey=$env:TS_KEY `
-            --hostname=github-rdp `
-            --accept-routes
+          & "C:\Program Files\Tailscale\tailscale.exe" up --auth-key "${{ secrets.TAILSCALE_KEY }}" --hostname github-rdp
 
-      - name: Habilitar Remote Desktop (RDP)
+      - name: Mantener la VM viva
         run: |
-          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
-                           -Name "fDenyTSConnections" -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-
-      - name: Mantener sesión activa
-        run: |
-          while ($true) {
-            Start-Sleep -Seconds 60
-          }
+          while ($true) { Start-Sleep -Seconds 60 }
