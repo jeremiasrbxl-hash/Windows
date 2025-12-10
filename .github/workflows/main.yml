@@ -1,20 +1,19 @@
 name: RDP
 
 on:
-  workflow_dispatch:      # Permite iniciarlo manualmente
+  workflow_dispatch:
   schedule:
-    - cron: "0 */6 * * *" # Se reinicia cada 6 horas automáticamente
+    - cron: "0 */6 * * *"
 
 jobs:
   rdp-server:
     runs-on: windows-latest
-    timeout-minutes: 350   # 5h50m (se detiene antes del límite de 6h)
+    timeout-minutes: 350
 
     steps:
       - name: Descargar Tailscale
         run: |
-          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" `
-                             -OutFile "tailscale.exe"
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "tailscale.exe"
 
       - name: Instalar Tailscale
         run: |
@@ -24,19 +23,18 @@ jobs:
         env:
           TS_KEY: ${{ secrets.TS_KEY }}
         run: |
-          tailscale up `
+          "C:\Program Files\Tailscale\tailscale.exe" up `
             --authkey=$env:TS_KEY `
             --hostname=github-rdp `
             --accept-routes `
             --ssh
 
-      - name: Habilitar Remote Desktop (RDP)
+      - name: Habilitar RDP
         run: |
-          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
-                           -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
-      - name: Mantener RDP activo
+      - name: Mantener sesión activa
         run: |
           while ($true) {
             Start-Sleep -Seconds 60
