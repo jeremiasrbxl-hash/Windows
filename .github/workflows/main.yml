@@ -23,15 +23,16 @@ jobs:
         env:
           TS_KEY: ${{ secrets.TS_KEY }}
         run: |
-          "C:\Program Files\Tailscale\tailscale.exe" up `
+          & "C:\Program Files\Tailscale\tailscale.exe" up `
             --authkey=$env:TS_KEY `
             --hostname=github-rdp `
             --accept-routes `
             --ssh
 
-      - name: Habilitar RDP
+      - name: Habilitar Remote Desktop (RDP)
         run: |
-          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
+                           -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
       - name: Mantener sesión activa
