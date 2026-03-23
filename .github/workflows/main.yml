@@ -32,6 +32,7 @@ jobs:
         shell: pwsh
         run: |
           Add-Type -AssemblyName System.Security
+
           $charSet = @{
               Upper   = [char[]](65..90)
               Lower   = [char[]](97..122)
@@ -96,13 +97,23 @@ jobs:
           $user = "RDP"
           $pass = "$env:RDP_PASSWORD"
 
-          $text = "<b>🖥️ RDP SYSTEM ONLINE</b>%0A%0A" +
-                  "━━━━━━━━━━━━━━%0A" +
-                  "🌐 <b>Dirección IP:</b>%0A<code>$ip</code>%0A%0A" +
-                  "👤 <b>Usuario:</b>%0A<code>$user</code>%0A%0A" +
-                  "🔑 <b>Contraseña:</b>%0A<code>$pass</code>%0A%0A" +
-                  "⏱ <b>Duración:</b> <code>5:50h</code>%0A" +
-                  "━━━━━━━━━━━━━━"
+          $text = @"
+<b>🖥️ RDP SYSTEM ONLINE</b>
+
+━━━━━━━━━━━━━━
+🌐 <b>Dirección IP:</b>
+<code>$ip</code>
+
+👤 <b>Usuario:</b>
+<code>$user</code>
+
+🔑 <b>Contraseña:</b>
+<code>$pass</code>
+
+⏱ <b>Duración:</b>
+<code>5:50h</code>
+━━━━━━━━━━━━━━
+"@
 
           Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" `
             -Method Post `
@@ -142,9 +153,9 @@ jobs:
           $status = "${{ job.status }}"
 
           if ($status -eq "success") {
-            $msg = "✅ <b>RDP FINALIZADO</b>%0AEl workflow ha terminado correctamente."
+            $msg = "<b>✅ RDP FINALIZADO</b>`nEl workflow terminó correctamente."
           } else {
-            $msg = "⚠️ <b>RDP FINALIZADO CON ERROR</b>%0ARevisa los logs del workflow."
+            $msg = "<b>⚠️ RDP FINALIZADO CON ERROR</b>`nRevisa los logs del workflow."
           }
 
           Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" `
