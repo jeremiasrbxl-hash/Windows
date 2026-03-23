@@ -14,6 +14,7 @@ jobs:
 
     steps:
       - name: Configure Core RDP Settings
+        shell: pwsh
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
                              -Name "fDenyTSConnections" -Value 0 -Force
@@ -28,8 +29,10 @@ jobs:
           Restart-Service -Name TermService -Force
 
       - name: Create RDP User
+        shell: pwsh
         run: |
           Add-Type -AssemblyName System.Security
+
           $charSet = @{
               Upper   = [char[]](65..90)
               Lower   = [char[]](97..122)
@@ -37,11 +40,13 @@ jobs:
               Special = ([char[]](33..47) + [char[]](58..64) +
                          [char[]](91..96) + [char[]](123..126))
           }
+
           $rawPassword = @()
           $rawPassword += $charSet.Upper | Get-Random -Count 4
           $rawPassword += $charSet.Lower | Get-Random -Count 4
           $rawPassword += $charSet.Number | Get-Random -Count 4
           $rawPassword += $charSet.Special | Get-Random -Count 4
+
           $password = -join ($rawPassword | Sort-Object { Get-Random })
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
 
@@ -52,6 +57,7 @@ jobs:
           echo "RDP_PASSWORD=$password" >> $env:GITHUB_ENV
 
       - name: Install Tailscale
+        shell: pwsh
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
           $installerPath = "$env:TEMP\tailscale.msi"
@@ -61,11 +67,13 @@ jobs:
           Remove-Item $installerPath -Force
 
       - name: Connect Tailscale
+        shell: pwsh
         run: |
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
 
           $tsIP = $null
           $retries = 0
+
           while (-not $tsIP -and $retries -lt 10) {
               $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
               Start-Sleep -Seconds 5
@@ -80,6 +88,7 @@ jobs:
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
       - name: Send RDP Info to Telegram (Clean UI)
+        shell: pwsh
         run: |
           $token = "${{ secrets.TELEGRAM_BOT_TOKEN }}"
           $chat_id = "${{ secrets.TELEGRAM_CHAT_ID }}"
@@ -88,21 +97,11 @@ jobs:
           $user = "RDP"
           $pass = "$env:RDP_PASSWORD"
 
-          $text = @"
-🖥️ *RDP ACTIVO*
-
-🌐 *Dirección*
-`$ip`
-
-👤 *Usuario*
-`$user`
-
-🔑 *Contraseña*
-`$pass`
-
-📋 *Copiar dirección*
-`$ip`
-"@
+          $text = "🖥️ RDP ACTIVO`n`n" +
+                  "🌐 Dirección:`n$ip`n`n" +
+                  "👤 Usuario:`n$user`n`n" +
+                  "🔑 Contraseña:`n$pass`n`n" +
+                  "📋 Copiar IP:`n$ip"
 
           Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" `
             -Method Post `
@@ -113,6 +112,7 @@ jobs:
             }
 
       - name: Maintain and Restart (5h 50m)
+        shell: pwsh
         run: |
           Start-Sleep -Seconds 21000
 
