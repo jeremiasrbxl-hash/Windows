@@ -16,12 +16,9 @@ jobs:
       - name: Configure Core RDP Settings
         shell: pwsh
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
-                             -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
-                             -Name "UserAuthentication" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
-                             -Name "SecurityLayer" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
 
           netsh advfirewall firewall delete rule name="RDP-Tailscale"
           netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
@@ -97,23 +94,13 @@ jobs:
           $user = "RDP"
           $pass = "$env:RDP_PASSWORD"
 
-          $text = @"
-<b>🖥️ RDP SYSTEM ONLINE</b>
-
-━━━━━━━━━━━━━━
-🌐 <b>Dirección IP:</b>
-<code>$ip</code>
-
-👤 <b>Usuario:</b>
-<code>$user</code>
-
-🔑 <b>Contraseña:</b>
-<code>$pass</code>
-
-⏱ <b>Duración:</b>
-<code>5:50h</code>
-━━━━━━━━━━━━━━
-"@
+          $text = "<b>🖥️ RDP SYSTEM ONLINE</b>`n`n" +
+                  "━━━━━━━━━━━━━━`n" +
+                  "🌐 <b>Dirección IP:</b>`n<code>$ip</code>`n`n" +
+                  "👤 <b>Usuario:</b>`n<code>$user</code>`n`n" +
+                  "🔑 <b>Contraseña:</b>`n<code>$pass</code>`n`n" +
+                  "⏱ <b>Duración:</b>`n<code>5:50h</code>`n" +
+                  "━━━━━━━━━━━━━━"
 
           Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" `
             -Method Post `
@@ -153,9 +140,9 @@ jobs:
           $status = "${{ job.status }}"
 
           if ($status -eq "success") {
-            $msg = "<b>✅ RDP FINALIZADO</b>`nEl workflow terminó correctamente."
+            $msg = "<b>✅ RDP FINALIZADO</b>`nWorkflow completado correctamente."
           } else {
-            $msg = "<b>⚠️ RDP FINALIZADO CON ERROR</b>`nRevisa los logs del workflow."
+            $msg = "<b>⚠️ RDP FINALIZADO CON ERROR</b>`nRevisa los logs."
           }
 
           Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" `
