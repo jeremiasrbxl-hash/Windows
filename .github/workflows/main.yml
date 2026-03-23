@@ -87,9 +87,22 @@ jobs:
           Write-Host "Password: $(echo $env:RDP_CREDS)"
           Write-Host "====================`n"
 
+      - name: Send RDP Info to Telegram
+        run: |
+          $token = "${{ secrets.TELEGRAM_BOT_TOKEN }}"
+          $chat_id = "${{ secrets.TELEGRAM_CHAT_ID }}"
+
+          $text = "🖥️ RDP ACTIVO`nIP: $env:TAILSCALE_IP`nUser: RDP`nPassword: $(echo $env:RDP_CREDS)"
+
+          Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" `
+            -Method Post `
+            -Body @{
+              chat_id = $chat_id
+              text = $text
+            }
+
       - name: Maintain and Restart (5h 50m)
         run: |
-          # Esperar 5h 50min (21000 segundos)
           Start-Sleep -Seconds 21000
 
           Write-Host "Reiniciando workflow..."
