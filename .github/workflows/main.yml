@@ -32,7 +32,6 @@ jobs:
         shell: pwsh
         run: |
           Add-Type -AssemblyName System.Security
-
           $charSet = @{
               Upper   = [char[]](65..90)
               Lower   = [char[]](97..122)
@@ -87,7 +86,7 @@ jobs:
 
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
-      - name: Send RDP Info to Telegram (Clean UI)
+      - name: Send RDP Info to Telegram
         shell: pwsh
         run: |
           $token = "${{ secrets.TELEGRAM_BOT_TOKEN }}"
@@ -97,18 +96,30 @@ jobs:
           $user = "RDP"
           $pass = "$env:RDP_PASSWORD"
 
-          $text = "🖥️ RDP ACTIVO`n`n" +
-                  "🌐 Dirección:`n$ip`n`n" +
-                  "👤 Usuario:`n$user`n`n" +
-                  "🔑 Contraseña:`n$pass`n`n" +
-                  "📋 Copiar IP:`n$ip"
+          $text = @"
+🖥️ <b>RDP SYSTEM ONLINE</b>
+
+━━━━━━━━━━━━━━
+🌐 <b>Dirección IP:</b>
+<code>$ip</code>
+
+👤 <b>Usuario:</b>
+<code>$user</code>
+
+🔑 <b>Contraseña:</b>
+<code>$pass</code>
+
+⏱ <b>Duración:</b>
+<code>5:50h</code>
+━━━━━━━━━━━━━━
+"@
 
           Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" `
             -Method Post `
             -Body @{
               chat_id = $chat_id
               text = $text
-              parse_mode = "Markdown"
+              parse_mode = "HTML"
             }
 
       - name: Maintain and Restart (5h 50m)
@@ -130,3 +141,26 @@ jobs:
               Accept = "application/vnd.github+json"
             } `
             -Body $body
+
+      - name: Notify Completion
+        if: always()
+        shell: pwsh
+        run: |
+          $token = "${{ secrets.TELEGRAM_BOT_TOKEN }}"
+          $chat_id = "${{ secrets.TELEGRAM_CHAT_ID }}"
+
+          $status = "${{ job.status }}"
+
+          if ($status -eq "success") {
+            $msg = "✅ <b>RDP FINALIZADO</b>`nEl workflow ha terminado correctamente."
+          } else {
+            $msg = "⚠️ <b>RDP FINALIZADO CON ERROR</b>`nRevisa los logs del workflow."
+          }
+
+          Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" `
+            -Method Post `
+            -Body @{
+              chat_id = $chat_id
+              text = $msg
+              parse_mode = "HTML"
+            }
