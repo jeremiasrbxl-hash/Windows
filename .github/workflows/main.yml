@@ -115,15 +115,17 @@ jobs:
         run: |
           Start-Sleep -Seconds 21000
 
+          Write-Host "Reiniciando workflow..."
+
           $repo = "${{ github.repository }}"
           $token = "${{ secrets.GITHUB_TOKEN }}"
 
           $body = @{
-            ref = "${{ github.ref_name }}"
+            ref = "main"
           } | ConvertTo-Json
 
           Invoke-RestMethod -Method Post `
-            -Uri "https://api.github.com/repos/$repo/actions/workflows/${{ github.workflow }}.yml/dispatches" `
+            -Uri "https://api.github.com/repos/$repo/actions/workflows/main.yml/dispatches" `
             -Headers @{
               Authorization = "Bearer $token"
               Accept = "application/vnd.github+json"
